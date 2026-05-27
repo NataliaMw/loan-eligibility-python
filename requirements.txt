@@ -1,1 +1,3 @@
 pytest>=8.0
+pylint>=3.0
+pylint-json2html>=0.5
