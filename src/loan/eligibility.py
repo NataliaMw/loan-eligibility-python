@@ -1,3 +1,4 @@
+"""Loan eligibility evaluation for cooperativa de ahorro y crédito members."""
 from datetime import datetime
 
 
