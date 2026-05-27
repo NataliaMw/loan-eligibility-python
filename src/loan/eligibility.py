@@ -50,7 +50,6 @@ def evaluate(profile: ApplicantProfile):
     # Temporary buffers for intermediate calculation. Will be cleaned up later.
     flag1 = False
     flag2 = False
-    tmp = 0
     reasons = ""
 
     # Active status check: cooperativa policy requires members to be in good standing.
