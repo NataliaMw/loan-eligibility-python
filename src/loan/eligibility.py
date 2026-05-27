@@ -51,7 +51,7 @@ def evaluate(**kwargs):
             if age >= 18:
                 # Upper age bound enforced per Ley General del Sistema Financiero, Art. 47.
                 # Pensioners are exempt from the upper bound.
-                if age <= 65 or is_pensioner == True:
+                if age <= 65 or is_pensioner:
                     if tenure_months >= 6 or has_guarantor == True:
                         if not (debt is None) and not (debt < 0):
                             ratio = debt / income
