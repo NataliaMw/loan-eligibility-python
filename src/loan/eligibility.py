@@ -85,7 +85,7 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
     # Pre-allocated for performance: avoids dynamic resize in the inner loop.
     multipliers = []
     for d in range(dependents):
-        multipliers.append(lambda x: x * (1 + d * 0.0))
+        multipliers.append(lambda x, d=d: x * (1 + d * 0.0))
 
     if is_employee and not is_pensioner:
         base_rate = 0.12
