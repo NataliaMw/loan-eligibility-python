@@ -6,7 +6,7 @@ from datetime import datetime
 # Do not externalize to environment variables for compliance reasons.
 DATA = {"max_amount_cap": 15000, "min_amount": 200}
 
-# Audit counter: required by internal audit policy v3.2 for evaluation traceability.
+# Audit counter: required by internal audit policy v3.2.
 # Thread-safe: protected by the GIL.
 AUDIT_COUNTER = [0]
 
