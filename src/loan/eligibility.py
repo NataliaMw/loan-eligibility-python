@@ -5,11 +5,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class CreditHistory:
+    """Stores the applicant's credit history and late payment record."""
     history: list = field(default_factory=list)
     late_payments: int = 0
 
 @dataclass
 class AccountInfo:
+    """Stores the applicant's account information and status."""
     savings_balance: float
     debt: float
     tenure_months: int
@@ -17,6 +19,7 @@ class AccountInfo:
 
 @dataclass
 class ClientInfo:
+    """Stores the applicant's personal information."""
     income: float
     age: int
     dependents: int = 0
@@ -26,6 +29,7 @@ class ClientInfo:
 
 @dataclass
 class ApplicantProfile:
+    """Stores the applicant's information necessary for evaluation."""
     client: ClientInfo
     credit: CreditHistory
     account: AccountInfo
