@@ -1,3 +1,5 @@
+"""Loan eligibility evaluation module."""
+
 from datetime import datetime
 from dataclasses import dataclass, field
 
