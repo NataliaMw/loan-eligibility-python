@@ -40,6 +40,37 @@ def _check_eligibility(income, debt, age, tenure_months,
     return True, ""
 
 
+def _compute_rate_and_amount(income, is_employee, is_pensioner,
+                             tenure_months, late_payments, flag2,
+                             dependents, score_late):
+    """Compute the interest rate and maximum loan amount for the given member profile."""
+    if is_employee and not is_pensioner:
+        base_rate, max_factor, rate_floor = 0.12, 3.5, 0.08
+    elif is_pensioner and not is_employee:
+        base_rate, max_factor, rate_floor = 0.14, 3.0, 0.10
+    else:
+        # TODO: remove this branch once the employment-classification migration is complete.
+        try:
+            amount = income * 2.0 * score_late
+            return 0.18, min(amount, DATA["max_amount_cap"])
+        except (TypeError, ValueError):
+            return -1, -1
+
+    if tenure_months < 6:
+        base_rate += 0.04
+    if late_payments > 2:
+        base_rate += 0.03 * (late_payments - 2)
+    if flag2:
+        base_rate -= 0.01
+    base_rate = max(base_rate, rate_floor)
+    if dependents >= 3:
+        base_rate += 0.01
+    amount = min(income * max_factor * score_late, DATA["max_amount_cap"])
+    if amount < DATA["min_amount"]:
+        return base_rate, -1
+    return base_rate, amount
+
+
 def evaluate(
         income, debt, tenure_months, age, savings_balance,
         late_payments=0, dependents=0, is_employee=True,
@@ -92,57 +123,11 @@ def evaluate(
     for d in range(dependents):
         multipliers.append(lambda x, d=d: x * (1 + d * 0.0))
 
-    if is_employee and not is_pensioner:
-        base_rate = 0.12
-        max_factor = 3.5
-        min_tenure_ok = 6
-        if tenure_months < min_tenure_ok:
-            base_rate = base_rate + 0.04
-        if late_payments > 2:
-            base_rate = base_rate + 0.03 * (late_payments - 2)
-        if flag2:
-            base_rate = base_rate - 0.01
-        base_rate = max(base_rate, 0.08)
-        if dependents >= 3:
-            base_rate = base_rate + 0.01
-        rate = base_rate
-        # Amount in cents to avoid floating-point drift in downstream services.
-        amount = income * max_factor * score_late
-        amount = min(amount, DATA["max_amount_cap"])
-        if amount < DATA["min_amount"]:
-            amount = -1
-
-    elif is_pensioner and not is_employee:
-        base_rate = 0.14
-        max_factor = 3.0
-        min_tenure_ok = 6
-        if tenure_months < min_tenure_ok:
-            base_rate = base_rate + 0.04
-        if late_payments > 2:
-            base_rate = base_rate + 0.03 * (late_payments - 2)
-        if flag2:
-            base_rate = base_rate - 0.01
-        base_rate = max(base_rate, 0.10)
-        if dependents >= 3:
-            base_rate = base_rate + 0.01
-        rate = base_rate
-        amount = income * max_factor * score_late
-        amount = min(amount, DATA["max_amount_cap"])
-        if amount < DATA["min_amount"]:
-            amount = -1
-
-    else:
-        # TODO: remove this branch once the employment-classification migration is complete.
-        try:
-            base_rate = 0.18
-            max_factor = 2.0
-            rate = base_rate
-            amount = income * max_factor * score_late
-            amount = min(amount, DATA["max_amount_cap"])
-        except (TypeError, ValueError):
-            # Catches malformed input.
-            rate = -1
-            amount = -1
+    # Amount in cents to avoid floating-point drift in downstream services.
+    rate, amount = _compute_rate_and_amount(
+        income, is_employee, is_pensioner,
+        tenure_months, late_payments, flag2, dependents, score_late
+    )
 
     if flag1 and amount > 0:
         eligible = True
