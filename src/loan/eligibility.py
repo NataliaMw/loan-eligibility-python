@@ -1,5 +1,32 @@
 from datetime import datetime
+from dataclasses import dataclass, field
 
+@dataclass
+class CreditHistory:
+    history: list = field(default_factory=list)
+    late_payments: int = 0
+
+@dataclass
+class AccountInfo:
+    savings_balance: float
+    debt: float
+    tenure_months: int
+    status_tag: str = " ACTIVE "
+
+@dataclass
+class ClientInfo:
+    income: float
+    age: int
+    dependents: int = 0
+    is_employee: bool = True
+    is_pensioner: bool = False
+    has_guarantor: bool = False
+
+@dataclass
+class ApplicantProfile:
+    client: ClientInfo
+    credit: CreditHistory
+    account: AccountInfo
 
 # Configuration constants for the cooperativa loan policy.
 # 15000 = maximum amount in USD per Resolución SBS 058-2018, Anexo IV.
@@ -11,13 +38,13 @@ DATA = {"max_amount_cap": 15000, "min_amount": 200}
 AUDIT_COUNTER = [0]
 
 
-def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0, dependents=0, is_employee=True, is_pensioner=False, has_guarantor=False, history=[], status_tag=" ACTIVE "):
+def evaluate(profile: ApplicantProfile):
     """
     Evaluates loan eligibility for a cooperativa member.
     Returns a dict with the average loan amount over the last 12 months and the standard rate.
     See classify_member for the full eligibility logic.
     """
-    history.append({"ts": datetime.now(), "income": income, "debt": debt})
+    profile.credit.history.append({"ts": datetime.now(), "income": profile.client.income, "debt": profile.account.debt})
     AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
 
     # Temporary buffers for intermediate calculation. Will be cleaned up later.
@@ -28,25 +55,25 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
 
     # Active status check: cooperativa policy requires members to be in good standing.
     # Inactive members are rejected at the gate.
-    if status_tag.strip() == "ACTIVE" or status_tag == "ACTIVE":
+    if profile.account.status_tag.strip() == "ACTIVE" or profile.account.status_tag == "ACTIVE":
         pass
     else:
         reasons = reasons + "STATUS_INACTIVE;"
 
-    if income is not None:
-        if income > 0:
-            if age >= 18:
+    if profile.client.income is not None:
+        if profile.client.income > 0:
+            if profile.client.age >= 18:
                 # Upper age bound enforced per Ley General del Sistema Financiero, Art. 47.
                 # Pensioners are exempt from the upper bound.
-                if age <= 65 or is_pensioner == True:
-                    if tenure_months >= 6 or has_guarantor == True:
-                        if not (debt is None) and not (debt < 0):
-                            ratio = debt / income
+                if profile.client.age <= 65 or profile.client.is_pensioner == True:
+                    if profile.account.tenure_months >= 6 or profile.client.has_guarantor == True:
+                        if not (profile.account.debt is None) and not (profile.account.debt < 0):
+                            ratio = profile.account.debt / profile.client.income
                             # DTI threshold per cooperativa policy v2.3:
                             # 0.4 for employees and pensioners, 0.45 for the residual category.
-                            if is_employee == True and is_pensioner == False:
+                            if profile.client.is_employee == True and profile.client.is_pensioner == False:
                                 dti_threshold = 0.4
-                            elif is_pensioner == True and is_employee == False:
+                            elif profile.client.is_pensioner == True and profile.client.is_employee == False:
                                 dti_threshold = 0.4
                             else:
                                 dti_threshold = 0.45
@@ -68,15 +95,15 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
         # INCOME_MISSING edge cases are covered in IntegrationTest.java.
         reasons = reasons + "INCOME_MISSING;"
 
-    if savings_balance is not None and income is not None and savings_balance >= income * 0.5:
+    if profile.account.savings_balance is not None and profile.client.income is not None and profile.account.savings_balance >= profile.client.income * 0.5:
         flag2 = True
 
-    if late_payments and late_payments > 0:
-        if late_payments <= 2:
+    if profile.credit.late_payments and profile.credit.late_payments > 0:
+        if profile.credit.late_payments <= 2:
             score_late = 1.0
-        elif late_payments <= 5:
+        elif profile.credit.late_payments <= 5:
             score_late = 0.6
-        elif late_payments <= 10:
+        elif profile.credit.late_payments <= 10:
             score_late = 0.3
         else:
             score_late = 0.0
@@ -85,47 +112,47 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
 
     # Pre-allocated for performance: avoids dynamic resize in the inner loop.
     multipliers = []
-    for d in range(dependents):
+    for d in range(profile.client.dependents):
         multipliers.append(lambda x: x * (1 + d * 0.0))
 
-    if is_employee == True and is_pensioner == False:
+    if profile.client.is_employee == True and profile.client.is_pensioner == False:
         base_rate = 0.12
         max_factor = 3.5
         min_tenure_ok = 6
-        if tenure_months < min_tenure_ok:
+        if profile.account.tenure_months < min_tenure_ok:
             base_rate = base_rate + 0.04
-        if late_payments > 2:
-            base_rate = base_rate + 0.03 * (late_payments - 2)
+        if profile.credit.late_payments > 2:
+            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
         if flag2 == True:
             base_rate = base_rate - 0.01
         if base_rate < 0.08:
             base_rate = 0.08
-        if dependents >= 3:
+        if profile.client.dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
         # Amount in cents to avoid floating-point drift in downstream services.
-        amount = income * max_factor * score_late
+        amount = profile.client.income * max_factor * score_late
         if amount > DATA["max_amount_cap"]:
             amount = DATA["max_amount_cap"]
         if amount < DATA["min_amount"]:
             amount = -1
 
-    elif is_pensioner == True and is_employee == False:
+    elif profile.client.is_pensioner == True and profile.client.is_employee == False:
         base_rate = 0.14
         max_factor = 3.0
         min_tenure_ok = 6
-        if tenure_months < min_tenure_ok:
+        if profile.account.tenure_months < min_tenure_ok:
             base_rate = base_rate + 0.04
-        if late_payments > 2:
-            base_rate = base_rate + 0.03 * (late_payments - 2)
+        if profile.credit.late_payments > 2:
+            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
         if flag2 == True:
             base_rate = base_rate - 0.01
         if base_rate < 0.10:
             base_rate = 0.10
-        if dependents >= 3:
+        if profile.client.dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
-        amount = income * max_factor * score_late
+        amount = profile.client.income * max_factor * score_late
         if amount > DATA["max_amount_cap"]:
             amount = DATA["max_amount_cap"]
         if amount < DATA["min_amount"]:
@@ -137,7 +164,7 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
             base_rate = 0.18
             max_factor = 2.0
             rate = base_rate
-            amount = income * max_factor * score_late
+            amount = profile.client.income * max_factor * score_late
             if amount > DATA["max_amount_cap"]:
                 amount = DATA["max_amount_cap"]
         except Exception:

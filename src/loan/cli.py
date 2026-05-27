@@ -1,5 +1,5 @@
 import argparse
-from loan.eligibility import evaluate, format_report
+from loan.eligibility import evaluate, format_report, ApplicantProfile, ClientInfo, CreditHistory, AccountInfo
 
 
 def main():
@@ -13,9 +13,25 @@ def main():
     p.add_argument("--dependents", type=int, default=0)
     p.add_argument("--name", type=str, default="Member")
     a = p.parse_args()
-    r = evaluate(a.income, a.debt, a.tenure_months, a.age, a.savings_balance, a.late_payments, a.dependents)
-    print(format_report(r, a.name))
 
+    applicant = ApplicantProfile(
+        client=ClientInfo(
+            income=a.income,
+            age=a.age,
+            dependents=a.dependents,
+        ),
+        credit=CreditHistory(
+            late_payments=a.late_payments,
+        ),
+        account=AccountInfo(
+            savings_balance=a.savings_balance,
+            debt=a.debt,
+            tenure_months=a.tenure_months,
+        ),
+    )
+
+    r = evaluate(applicant)
+    print(format_report(r, a.name))
 
 if __name__ == "__main__":
     main()
