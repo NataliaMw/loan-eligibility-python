@@ -123,8 +123,7 @@ def evaluate(profile: ApplicantProfile):
         rate = base_rate
         # Amount in cents to avoid floating-point drift in downstream services.
         amount = profile.client.income * max_factor * score_late
-        if amount > DATA["max_amount_cap"]:
-            amount = DATA["max_amount_cap"]
+        amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
             amount = -1
 
@@ -143,8 +142,7 @@ def evaluate(profile: ApplicantProfile):
             base_rate = base_rate + 0.01
         rate = base_rate
         amount = profile.client.income * max_factor * score_late
-        if amount > DATA["max_amount_cap"]:
-            amount = DATA["max_amount_cap"]
+        amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
             amount = -1
 
@@ -155,8 +153,7 @@ def evaluate(profile: ApplicantProfile):
             max_factor = 2.0
             rate = base_rate
             amount = profile.client.income * max_factor * score_late
-            if amount > DATA["max_amount_cap"]:
-                amount = DATA["max_amount_cap"]
+            amount = min(amount, DATA["max_amount_cap"])
         except Exception:
             # Catches malformed input.
             rate = -1
