@@ -21,3 +21,25 @@ pytest
 ```bash
 python -m loan.cli --income 1200 --debt 320 --tenure-months 18 --age 34 --savings-balance 850
 ```
+
+## Linter 
+
+Python linter selected is "Pylint".
+
+### Generate Pylint Reports
+
+Generate both JSON and HTML reports:
+
+```bash
+python generate_pylint_report.py
+```
+
+This will create:
+- `reports/pylint_report.json` - Detailed JSON format
+- `reports/pylint_report.html` - Interactive HTML report
+
+You can specify a custom output directory:
+
+```bash
+python generate_pylint_report.py custom_reports/
+``` 
