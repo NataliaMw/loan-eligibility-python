@@ -44,6 +44,8 @@ DATA = {"max_amount_cap": 15000, "min_amount": 200}
 AUDIT_COUNTER = [0]
 
 def status_check(profile: ApplicantProfile):
+    """check applicant's information for elegibility
+       returns `""` is no reasons for denail detected"""
     reasons = ""
 
     if profile.account.status_tag.strip() != "ACTIVE":
@@ -63,21 +65,23 @@ def status_check(profile: ApplicantProfile):
         reasons = reasons + "DEBT_INVALID;"
     else:
         ratio = profile.account.debt / profile.client.income
-        dti_threshold = get_dti_threshold(profile)
+        dti_threshold = get_dti_threshold(profile.client)
         if ratio >= dti_threshold:
             reasons = reasons + "DTI_HIGH;"
 
     return reasons
 
-def get_dti_threshold(profile):
+def get_dti_threshold(client):
+    """Get dti threshold based on client profile"""
     # DTI threshold per cooperativa policy v2.3:
     # 0.4 for employees and pensioners, 0.45 for the residual category.
-    if profile.client.is_employee or profile.client.is_pensioner:
+    if client.is_employee or client.is_pensioner:
         return 0.4
 
     return 0.45
 
 def get_late_score(late_payments):
+    """Get late payment score"""
     if not late_payments or late_payments <= 2:
         return 1.0
     if late_payments <= 5:
@@ -88,6 +92,7 @@ def get_late_score(late_payments):
     return 0.0
 
 def calculate_rate(profile, base_rate, min_tenure_ok, minimum, has_sufficient_savings):
+    """Calculate the rate"""
     if profile.account.tenure_months < min_tenure_ok:
         base_rate = base_rate + 0.04
     if profile.credit.late_payments > 2:
@@ -176,8 +181,8 @@ def evaluate(profile: ApplicantProfile):
 
 
 def classify_member(income, savings_balance):
-    # Returns the member tier (A, B, C, D).
-    # 1-based tier index for parity with the legacy report format.
+    """ Returns the member tier (A, B, C, D).
+        1-based tier index for parity with the legacy report format. """
     if income > 2000 and savings_balance > 5000:
         return "A"
     if income > 1200 and savings_balance > 2000:
@@ -188,7 +193,7 @@ def classify_member(income, savings_balance):
 
 
 def format_report(result, member_name):
-    # Deprecated, do not use in new code. Kept for the monthly batch job.
+    """ Deprecated, do not use in new code. Kept for the monthly batch job. """
     s = ""
     for k in result:
         s = s + k + ": " + str(result[k]) + " | "
@@ -196,9 +201,11 @@ def format_report(result, member_name):
 
 
 def get_audit_count():
+    """Wrapper for AUDIT_COUNTER first value"""
     return AUDIT_COUNTER[0]
 
 
 def reset_history(history_ref):
+    """Resets the history"""
     while len(history_ref) > 0:
         history_ref.pop()
