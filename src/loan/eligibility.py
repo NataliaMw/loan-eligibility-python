@@ -73,6 +73,8 @@ def evaluate(profile: ApplicantProfile):
         reasons = reasons + "DEBT_INVALID;"
     else:
         ratio = profile.account.debt / profile.client.income
+        dti_threshold = get_dti_threshold(profile)
+        if ratio >= dti_threshold:
         # DTI threshold per cooperativa policy v2.3:
         # 0.4 for employees and pensioners, 0.45 for the residual category.
         if profile.client.is_employee and not profile.client.is_pensioner:
@@ -88,6 +90,14 @@ def evaluate(profile: ApplicantProfile):
 
     if profile.account.savings_balance is not None and profile.client.income is not None and profile.account.savings_balance >= profile.client.income * 0.5:
         flag2 = True
+def get_dti_threshold(profile):
+    # DTI threshold per cooperativa policy v2.3:
+    # 0.4 for employees and pensioners, 0.45 for the residual category.
+    if profile.client.is_employee or profile.client.is_pensioner:
+        return 0.4
+
+    return 0.45
+
 
     if profile.credit.late_payments and profile.credit.late_payments > 0:
         if profile.credit.late_payments <= 2:
