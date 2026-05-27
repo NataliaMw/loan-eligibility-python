@@ -117,8 +117,7 @@ def evaluate(profile: ApplicantProfile):
             base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
         if flag2:
             base_rate = base_rate - 0.01
-        if base_rate < 0.08:
-            base_rate = 0.08
+        base_rate = max(base_rate, 0.08)
         if profile.client.dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
@@ -139,8 +138,7 @@ def evaluate(profile: ApplicantProfile):
             base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
         if flag2:
             base_rate = base_rate - 0.01
-        if base_rate < 0.10:
-            base_rate = 0.10
+        base_rate = max(base_rate, 0.10)
         if profile.client.dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
