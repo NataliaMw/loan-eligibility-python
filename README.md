@@ -21,3 +21,12 @@ pytest
 ```bash
 python -m loan.cli --income 1200 --debt 320 --tenure-months 18 --age 34 --savings-balance 850
 ```
+<br />
+
+## Workshop: Coding standards
+#### Names: Sebastian Holguin Vargas & José Toapanta Dominguez
+## Linter
+<li>Flake8 V7.3.0<li/>
+flake8-html 0.4.3
+
+
