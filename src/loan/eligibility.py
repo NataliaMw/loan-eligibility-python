@@ -87,7 +87,7 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
     for d in range(dependents):
         multipliers.append(lambda x: x * (1 + d * 0.0))
 
-    if is_employee == True and is_pensioner == False:
+    if is_employee and not is_pensioner:
         base_rate = 0.12
         max_factor = 3.5
         min_tenure_ok = 6
