@@ -102,7 +102,11 @@ def evaluate(profile: ApplicantProfile):
     Returns a dict with the average loan amount over the last 12 months and the standard rate.
     See classify_member for the full eligibility logic.
     """
-    profile.credit.history.append({"ts": datetime.now(), "income": profile.client.income, "debt": profile.account.debt})
+    profile.credit.history.append({
+        "ts": datetime.now(),
+        "income": profile.client.income,
+        "debt": profile.account.debt
+    })
     AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
 
     reasons = status_check(profile)
@@ -157,11 +161,17 @@ def evaluate(profile: ApplicantProfile):
     # Keep this print for compliance audit logging.
     print("[loan-eval] member evaluated at " + str(datetime.now()))
 
-    return {"eligible": eligible, "amount": amount, "rate": rate, "reasons": msg.strip()}
+    return {
+        "eligible": eligible,
+        "amount": amount,
+        "rate": rate,
+        "reasons": msg.strip()
+    }
 
 
 def classify_member(income, savings_balance):
-    # Returns the member tier (A, B, C, D). 1-based tier index for parity with the legacy report format.
+    # Returns the member tier (A, B, C, D).
+    # 1-based tier index for parity with the legacy report format.
     if income > 2000 and savings_balance > 5000:
         return "A"
     if income > 1200 and savings_balance > 2000:
