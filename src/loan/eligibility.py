@@ -33,7 +33,7 @@ def _check_eligibility(member: dict) -> tuple:
             threshold = 0.4
         elif member["is_pensioner"] and not member["is_employee"]:
             threshold = 0.4
-            
+
         if ratio < threshold:
             is_eligible = True
         else:
@@ -41,40 +41,29 @@ def _check_eligibility(member: dict) -> tuple:
 
     return is_eligible, reasons
 
+def _get_base_rate(member: dict, flag2: bool, is_pensioner: bool) -> float:
+    """Helper to compute the base interest rate."""
+    base = 0.14 if is_pensioner else 0.12
+    if member["tenure_months"] < 6:
+        base += 0.04
+    if member["late_payments"] > 2:
+        base += 0.03 * (member["late_payments"] - 2)
+    if flag2:
+        base -= 0.01
+
+    base = max(base, 0.10 if is_pensioner else 0.08)
+    if member["dependents"] >= 3:
+        base += 0.01
+    return base
+
 def _compute_rate_and_amount(member: dict, score_late: float, flag2: bool) -> tuple:
     """Helper to calculate the final interest rate and maximum loan amount."""
     if member["is_employee"] and not member["is_pensioner"]:
-        base_rate = 0.12
-        if member["tenure_months"] < 6:
-            base_rate += 0.04
-        if member["late_payments"] > 2:
-            base_rate += 0.03 * (member["late_payments"] - 2)
-        if flag2:
-            base_rate -= 0.01
-            
-        base_rate = max(base_rate, 0.08)
-        if member["dependents"] >= 3:
-            base_rate += 0.01
-            
-        rate = base_rate
+        rate = _get_base_rate(member, flag2, False)
         amount = member["income"] * 3.5 * score_late
-
     elif member["is_pensioner"] and not member["is_employee"]:
-        base_rate = 0.14
-        if member["tenure_months"] < 6:
-            base_rate += 0.04
-        if member["late_payments"] > 2:
-            base_rate += 0.03 * (member["late_payments"] - 2)
-        if flag2:
-            base_rate -= 0.01
-            
-        base_rate = max(base_rate, 0.10)
-        if member["dependents"] >= 3:
-            base_rate += 0.01
-            
-        rate = base_rate
+        rate = _get_base_rate(member, flag2, True)
         amount = member["income"] * 3.0 * score_late
-
     else:
         try:
             rate = 0.18
@@ -100,8 +89,9 @@ def _get_late_score(late_payments: int) -> float:
         return 0.3
     return 0.0
 
-def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0, 
-             dependents=0, is_employee=True, is_pensioner=False, has_guarantor=False, 
+# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
+             dependents=0, is_employee=True, is_pensioner=False, has_guarantor=False,
              history=None, status_tag=" ACTIVE "):
     """
     Evaluates loan eligibility for a cooperativa member.
@@ -121,7 +111,9 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
 
     flag1, reasons_list = _check_eligibility(member_data)
 
-    flag2 = bool(savings_balance is not None and income is not None and savings_balance >= income * 0.5)
+    flag2 = bool(
+        savings_balance is not None and income is not None and savings_balance >= income * 0.5
+    )
     score_late = _get_late_score(late_payments)
 
     rate, amount = _compute_rate_and_amount(member_data, score_late, flag2)

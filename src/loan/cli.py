@@ -16,6 +16,7 @@ def main():
     p.add_argument("--dependents", type=int, default=0)
     p.add_argument("--name", type=str, default="Member")
     a = p.parse_args()
+
     r = evaluate(
         a.income, a.debt, a.tenure_months, a.age, a.savings_balance,
         late_payments=a.late_payments, dependents=a.dependents
