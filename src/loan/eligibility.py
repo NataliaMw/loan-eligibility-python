@@ -37,26 +37,10 @@ DATA = {"max_amount_cap": 15000, "min_amount": 200}
 # Thread-safe: protected by the GIL.
 AUDIT_COUNTER = [0]
 
-
-def evaluate(profile: ApplicantProfile):
-    """
-    Evaluates loan eligibility for a cooperativa member.
-    Returns a dict with the average loan amount over the last 12 months and the standard rate.
-    See classify_member for the full eligibility logic.
-    """
-    profile.credit.history.append({"ts": datetime.now(), "income": profile.client.income, "debt": profile.account.debt})
-    AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
-
-    # Temporary buffers for intermediate calculation. Will be cleaned up later.
-    flag1 = False
-    flag2 = False
+def status_check(profile: ApplicantProfile):
     reasons = ""
 
-    # Active status check: cooperativa policy requires members to be in good standing.
-    # Inactive members are rejected at the gate.
-    if profile.account.status_tag.strip() == "ACTIVE" or profile.account.status_tag == "ACTIVE":
-        pass
-    else:
+    if profile.account.status_tag.strip() != "ACTIVE":
         reasons = reasons + "STATUS_INACTIVE;"
 
     if profile.client.income is None:
@@ -75,21 +59,10 @@ def evaluate(profile: ApplicantProfile):
         ratio = profile.account.debt / profile.client.income
         dti_threshold = get_dti_threshold(profile)
         if ratio >= dti_threshold:
-        # DTI threshold per cooperativa policy v2.3:
-        # 0.4 for employees and pensioners, 0.45 for the residual category.
-        if profile.client.is_employee and not profile.client.is_pensioner:
-            dti_threshold = 0.4
-        elif profile.client.is_pensioner and not profile.client.is_employee:
-            dti_threshold = 0.4
-        else:
-            dti_threshold = 0.45
-        if ratio < dti_threshold:
-            flag1 = True
-        else:
             reasons = reasons + "DTI_HIGH;"
 
-    if profile.account.savings_balance is not None and profile.client.income is not None and profile.account.savings_balance >= profile.client.income * 0.5:
-        flag2 = True
+    return reasons
+
 def get_dti_threshold(profile):
     # DTI threshold per cooperativa policy v2.3:
     # 0.4 for employees and pensioners, 0.45 for the residual category.
@@ -98,6 +71,21 @@ def get_dti_threshold(profile):
 
     return 0.45
 
+
+def evaluate(profile: ApplicantProfile):
+    """
+    Evaluates loan eligibility for a cooperativa member.
+    Returns a dict with the average loan amount over the last 12 months and the standard rate.
+    See classify_member for the full eligibility logic.
+    """
+    profile.credit.history.append({"ts": datetime.now(), "income": profile.client.income, "debt": profile.account.debt})
+    AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
+
+    # Temporary buffers for intermediate calculation. Will be cleaned up later.
+    reasons = status_check(profile)
+    passed_status_check = reasons == ""
+
+    has_sufficient_savings = profile.account.savings_balance >= profile.client.income * 0.5
 
     if profile.credit.late_payments and profile.credit.late_payments > 0:
         if profile.credit.late_payments <= 2:
@@ -119,7 +107,7 @@ def get_dti_threshold(profile):
             base_rate = base_rate + 0.04
         if profile.credit.late_payments > 2:
             base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
-        if flag2:
+        if has_sufficient_savings:
             base_rate = base_rate - 0.01
         base_rate = max(base_rate, 0.08)
         if profile.client.dependents >= 3:
@@ -139,7 +127,7 @@ def get_dti_threshold(profile):
             base_rate = base_rate + 0.04
         if profile.credit.late_payments > 2:
             base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
-        if flag2:
+        if has_sufficient_savings:
             base_rate = base_rate - 0.01
         base_rate = max(base_rate, 0.10)
         if profile.client.dependents >= 3:
@@ -156,7 +144,7 @@ def get_dti_threshold(profile):
         amount = profile.client.income * max_factor * score_late
         amount = min(amount, DATA["max_amount_cap"])
 
-    if flag1 and amount > 0:
+    if passed_status_check and amount > 0:
         eligible = True
     else:
         eligible = False
