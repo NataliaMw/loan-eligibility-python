@@ -21,10 +21,8 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
     history.append({"ts": datetime.now(), "income": income, "debt": debt})
     AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
 
-    # Temporary buffers for intermediate calculation. Will be cleaned up later.
     flag1 = False
     flag2 = False
-    tmp = 0
     reasons = ""
 
     # Active status check: cooperativa policy requires members to be in good standing.
