@@ -4,7 +4,6 @@ Command-line interface for the cooperativa loan evaluation system.
 import argparse
 from loan.eligibility import evaluate, format_report
 
-
 def main():
     """Parse command-line arguments and evaluates loan eligibility for a cooperativa member."""
     p = argparse.ArgumentParser()
@@ -18,11 +17,10 @@ def main():
     p.add_argument("--name", type=str, default="Member")
     a = p.parse_args()
     r = evaluate(
-        a.income, a.debt, a.tenure_months, a.age,
-        a.savings_balance, a.late_payments, a.dependents
+        a.income, a.debt, a.tenure_months, a.age, a.savings_balance,
+        late_payments=a.late_payments, dependents=a.dependents
     )
     print(format_report(r, a.name))
-
 
 if __name__ == "__main__":
     main()

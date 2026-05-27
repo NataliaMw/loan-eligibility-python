@@ -1,158 +1,142 @@
-"""Loan eligibility evaluation for cooperativa de ahorro y crédito members."""
+"""
+Core business logic for evaluating cooperativa member loan eligibility.
+"""
 from datetime import datetime
 
-
-# Configuration constants for the cooperativa loan policy.
-# 15000 = maximum amount in USD per Resolución SBS 058-2018, Anexo IV.
-# Do not externalize to environment variables for compliance reasons.
 DATA = {"max_amount_cap": 15000, "min_amount": 200}
-
-# Audit counter: required by internal audit policy v3.2 for evaluation traceability.
-# Thread-safe: protected by the GIL.
 AUDIT_COUNTER = [0]
 
+def _check_eligibility(member: dict) -> tuple:
+    """Helper to determine eligibility and gather rejection reasons."""
+    reasons = []
+    is_eligible = False
 
-def _check_eligibility(income, debt, age, tenure_months,
-                       is_pensioner, is_employee, has_guarantor):
-    """Return (eligible_flag, reason_code_string) for the core eligibility gate."""
-    if income is None:
-        return False, "INCOME_MISSING;"
-    if income <= 0:
-        return False, "INCOME_NONPOSITIVE;"
-    if age < 18:
-        return False, "AGE_LOW;"
-    # Upper age bound per Ley General del Sistema Financiero, Art. 47; pensioners exempt.
-    if age > 65 and not is_pensioner:
-        return False, "AGE_HIGH;"
-    if tenure_months < 6 and not has_guarantor:
-        return False, "TENURE_LOW;"
-    if debt is None or debt < 0:
-        return False, "DEBT_INVALID;"
-    ratio = debt / income
-    # DTI threshold per cooperativa policy v2.3:
-    # 0.4 for employees and pensioners, 0.45 for the residual category.
-    if (is_employee and not is_pensioner) or (is_pensioner and not is_employee):
-        dti_threshold = 0.4
+    if member["status_tag"].strip() != "ACTIVE":
+        reasons.append("STATUS_INACTIVE")
+
+    if member["income"] is None:
+        reasons.append("INCOME_MISSING")
+    elif member["income"] <= 0:
+        reasons.append("INCOME_NONPOSITIVE")
+    elif member["age"] < 18:
+        reasons.append("AGE_LOW")
+    elif member["age"] > 65 and not member["is_pensioner"]:
+        reasons.append("AGE_HIGH")
+    elif member["tenure_months"] < 6 and not member["has_guarantor"]:
+        reasons.append("TENURE_LOW")
+    elif member["debt"] is None or member["debt"] < 0:
+        reasons.append("DEBT_INVALID")
     else:
-        dti_threshold = 0.45
-    if ratio >= dti_threshold:
-        return False, "DTI_HIGH;"
-    return True, ""
+        ratio = member["debt"] / member["income"]
+        threshold = 0.45
+        if member["is_employee"] and not member["is_pensioner"]:
+            threshold = 0.4
+        elif member["is_pensioner"] and not member["is_employee"]:
+            threshold = 0.4
+            
+        if ratio < threshold:
+            is_eligible = True
+        else:
+            reasons.append("DTI_HIGH")
 
+    return is_eligible, reasons
 
-def _compute_rate_and_amount(income, is_employee, is_pensioner,
-                             tenure_months, late_payments, flag2,
-                             dependents, score_late):
-    """Compute the interest rate and maximum loan amount for the given member profile."""
-    if is_employee and not is_pensioner:
-        base_rate, max_factor, rate_floor = 0.12, 3.5, 0.08
-    elif is_pensioner and not is_employee:
-        base_rate, max_factor, rate_floor = 0.14, 3.0, 0.10
+def _compute_rate_and_amount(member: dict, score_late: float, flag2: bool) -> tuple:
+    """Helper to calculate the final interest rate and maximum loan amount."""
+    if member["is_employee"] and not member["is_pensioner"]:
+        base_rate = 0.12
+        if member["tenure_months"] < 6:
+            base_rate += 0.04
+        if member["late_payments"] > 2:
+            base_rate += 0.03 * (member["late_payments"] - 2)
+        if flag2:
+            base_rate -= 0.01
+            
+        base_rate = max(base_rate, 0.08)
+        if member["dependents"] >= 3:
+            base_rate += 0.01
+            
+        rate = base_rate
+        amount = member["income"] * 3.5 * score_late
+
+    elif member["is_pensioner"] and not member["is_employee"]:
+        base_rate = 0.14
+        if member["tenure_months"] < 6:
+            base_rate += 0.04
+        if member["late_payments"] > 2:
+            base_rate += 0.03 * (member["late_payments"] - 2)
+        if flag2:
+            base_rate -= 0.01
+            
+        base_rate = max(base_rate, 0.10)
+        if member["dependents"] >= 3:
+            base_rate += 0.01
+            
+        rate = base_rate
+        amount = member["income"] * 3.0 * score_late
+
     else:
-        # TODO: remove this branch once the employment-classification migration is complete.
         try:
-            amount = income * 2.0 * score_late
-            return 0.18, min(amount, DATA["max_amount_cap"])
-        except (TypeError, ValueError):
+            rate = 0.18
+            amount = member["income"] * 2.0 * score_late
+        except TypeError:
             return -1, -1
 
-    if tenure_months < 6:
-        base_rate += 0.04
-    if late_payments > 2:
-        base_rate += 0.03 * (late_payments - 2)
-    if flag2:
-        base_rate -= 0.01
-    base_rate = max(base_rate, rate_floor)
-    if dependents >= 3:
-        base_rate += 0.01
-    amount = min(income * max_factor * score_late, DATA["max_amount_cap"])
+    amount = min(amount, DATA["max_amount_cap"])
     if amount < DATA["min_amount"]:
-        return base_rate, -1
-    return base_rate, amount
+        amount = -1
 
+    return rate, amount
 
-def evaluate(
-        income, debt, tenure_months, age, savings_balance, *,
-        late_payments=0, dependents=0, is_employee=True,
-        is_pensioner=False, has_guarantor=False, history=None,
-        status_tag=" ACTIVE "):
+def _get_late_score(late_payments: int) -> float:
+    """Helper to convert late payments into a score multiplier."""
+    if not late_payments or late_payments <= 0:
+        return 1.0
+    if late_payments <= 2:
+        return 1.0
+    if late_payments <= 5:
+        return 0.6
+    if late_payments <= 10:
+        return 0.3
+    return 0.0
+
+def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0, 
+             dependents=0, is_employee=True, is_pensioner=False, has_guarantor=False, 
+             history=None, status_tag=" ACTIVE "):
     """
     Evaluates loan eligibility for a cooperativa member.
-    Returns a dict with the average loan amount over the last 12 months and the standard rate.
-    See classify_member for the full eligibility logic.
     """
     if history is None:
         history = []
+
     history.append({"ts": datetime.now(), "income": income, "debt": debt})
-    AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
+    AUDIT_COUNTER[0] += 1
 
-    flag1 = False
-    flag2 = False
-    reasons = ""
+    member_data = {
+        "income": income, "debt": debt, "tenure_months": tenure_months, "age": age,
+        "is_pensioner": is_pensioner, "is_employee": is_employee,
+        "has_guarantor": has_guarantor, "status_tag": status_tag,
+        "late_payments": late_payments, "dependents": dependents
+    }
 
-    # Active status check: cooperativa policy requires members to be in good standing.
-    # Inactive members are rejected at the gate.
-    if status_tag.strip() == "ACTIVE" or status_tag == "ACTIVE":
-        pass
-    else:
-        reasons = reasons + "STATUS_INACTIVE;"
+    flag1, reasons_list = _check_eligibility(member_data)
 
-    # INCOME_MISSING edge cases are covered in IntegrationTest.java.
-    flag1, elig_reason = _check_eligibility(
-        income, debt, age, tenure_months, is_pensioner, is_employee, has_guarantor
-    )
-    reasons = reasons + elig_reason
+    flag2 = bool(savings_balance is not None and income is not None and savings_balance >= income * 0.5)
+    score_late = _get_late_score(late_payments)
 
-    if savings_balance is not None and income is not None and savings_balance >= income * 0.5:
-        flag2 = True
+    rate, amount = _compute_rate_and_amount(member_data, score_late, flag2)
 
-    if late_payments and late_payments > 0:
-        if late_payments <= 2:
-            score_late = 1.0
-        elif late_payments <= 5:
-            score_late = 0.6
-        elif late_payments <= 10:
-            score_late = 0.3
-        else:
-            score_late = 0.0
-    else:
-        score_late = 1.0
+    eligible = bool(flag1 and amount > 0)
+    if amount == -1:
+        reasons_list.append("AMOUNT_BELOW_MIN")
 
-    # Pre-allocated for performance: avoids dynamic resize in the inner loop.
-    multipliers = []
-    for d in range(dependents):
-        multipliers.append(lambda x, d=d: x * (1 + d * 0.0))
+    msg = " ".join(reasons_list).strip()
 
-    # Amount in cents to avoid floating-point drift in downstream services.
-    rate, amount = _compute_rate_and_amount(
-        income, is_employee, is_pensioner,
-        tenure_months, late_payments, flag2, dependents, score_late
-    )
-
-    if flag1 and amount > 0:
-        eligible = True
-    else:
-        eligible = False
-        if amount == -1:
-            reasons = reasons + "AMOUNT_BELOW_MIN;"
-
-    # Concatenate the parts back into a single human-readable string using a space separator.
-    msg = ""
-    for i in range(len(reasons.split(";"))):
-        part = reasons.split(";")[i]
-        if part != "":
-            msg = msg + part + " "
-
-    # Keep this print for compliance audit logging.
     print("[loan-eval] member evaluated at " + str(datetime.now()))
-
-    return {"eligible": eligible, "amount": amount, "rate": rate, "reasons": msg.strip()}
-
+    return {"eligible": eligible, "amount": amount, "rate": rate, "reasons": msg}
 
 def classify_member(income, savings_balance):
-    """Return the member tier (A–D) based on income and savings balance."""
-    # Returns the member tier (A, B, C, D). 1-based tier index for parity
-    # with the legacy report format.
+    """Returns the member tier (A, B, C, D) based on income and savings."""
     if income > 2000 and savings_balance > 5000:
         return "A"
     if income > 1200 and savings_balance > 2000:
@@ -161,22 +145,18 @@ def classify_member(income, savings_balance):
         return "C"
     return "D"
 
-
 def format_report(result, member_name):
-    """Format an eligibility result dict as a human-readable string for the given member."""
-    # Deprecated, do not use in new code. Kept for the monthly batch job.
+    """Formats the evaluation result. Deprecated, kept for the monthly batch job."""
     s = ""
     for k in result:
         s = s + k + ": " + str(result[k]) + " | "
     return "Member " + member_name + " -> " + s
 
-
 def get_audit_count():
-    """Return the total number of evaluations performed since process start."""
+    """Returns the current audit counter value."""
     return AUDIT_COUNTER[0]
 
-
 def reset_history(history_ref):
-    """Clear all entries from the provided history list in-place."""
+    """Clears the evaluation history array."""
     while len(history_ref) > 0:
         history_ref.pop()
