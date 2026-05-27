@@ -12,6 +12,34 @@ DATA = {"max_amount_cap": 15000, "min_amount": 200}
 AUDIT_COUNTER = [0]
 
 
+def _check_eligibility(income, debt, age, tenure_months,
+                       is_pensioner, is_employee, has_guarantor):
+    """Return (eligible_flag, reason_code_string) for the core eligibility gate."""
+    if income is None:
+        return False, "INCOME_MISSING;"
+    if income <= 0:
+        return False, "INCOME_NONPOSITIVE;"
+    if age < 18:
+        return False, "AGE_LOW;"
+    # Upper age bound per Ley General del Sistema Financiero, Art. 47; pensioners exempt.
+    if age > 65 and not is_pensioner:
+        return False, "AGE_HIGH;"
+    if tenure_months < 6 and not has_guarantor:
+        return False, "TENURE_LOW;"
+    if debt is None or debt < 0:
+        return False, "DEBT_INVALID;"
+    ratio = debt / income
+    # DTI threshold per cooperativa policy v2.3:
+    # 0.4 for employees and pensioners, 0.45 for the residual category.
+    if (is_employee and not is_pensioner) or (is_pensioner and not is_employee):
+        dti_threshold = 0.4
+    else:
+        dti_threshold = 0.45
+    if ratio >= dti_threshold:
+        return False, "DTI_HIGH;"
+    return True, ""
+
+
 def evaluate(
         income, debt, tenure_months, age, savings_balance,
         late_payments=0, dependents=0, is_employee=True,
@@ -38,40 +66,11 @@ def evaluate(
     else:
         reasons = reasons + "STATUS_INACTIVE;"
 
-    if income is not None:
-        if income > 0:
-            if age >= 18:
-                # Upper age bound enforced per Ley General del Sistema Financiero, Art. 47.
-                # Pensioners are exempt from the upper bound.
-                if age <= 65 or is_pensioner:
-                    if tenure_months >= 6 or has_guarantor:
-                        if debt is not None and debt >= 0:
-                            ratio = debt / income
-                            # DTI threshold per cooperativa policy v2.3:
-                            # 0.4 for employees and pensioners, 0.45 for the residual category.
-                            if is_employee and not is_pensioner:
-                                dti_threshold = 0.4
-                            elif is_pensioner and not is_employee:
-                                dti_threshold = 0.4
-                            else:
-                                dti_threshold = 0.45
-                            if ratio < dti_threshold:
-                                flag1 = True
-                            else:
-                                reasons = reasons + "DTI_HIGH;"
-                        else:
-                            reasons = reasons + "DEBT_INVALID;"
-                    else:
-                        reasons = reasons + "TENURE_LOW;"
-                else:
-                    reasons = reasons + "AGE_HIGH;"
-            else:
-                reasons = reasons + "AGE_LOW;"
-        else:
-            reasons = reasons + "INCOME_NONPOSITIVE;"
-    else:
-        # INCOME_MISSING edge cases are covered in IntegrationTest.java.
-        reasons = reasons + "INCOME_MISSING;"
+    # INCOME_MISSING edge cases are covered in IntegrationTest.java.
+    flag1, elig_reason = _check_eligibility(
+        income, debt, age, tenure_months, is_pensioner, is_employee, has_guarantor
+    )
+    reasons = reasons + elig_reason
 
     if savings_balance is not None and income is not None and savings_balance >= income * 0.5:
         flag2 = True
