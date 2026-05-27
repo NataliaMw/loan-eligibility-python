@@ -101,11 +101,6 @@ def evaluate(profile: ApplicantProfile):
     else:
         score_late = 1.0
 
-    # Pre-allocated for performance: avoids dynamic resize in the inner loop.
-    multipliers = []
-    for d in range(profile.client.dependents):
-        multipliers.append(lambda x: x * (1 + d * 0.0))
-
     if profile.client.is_employee and not profile.client.is_pensioner:
         base_rate = 0.12
         max_factor = 3.5
