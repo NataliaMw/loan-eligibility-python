@@ -84,17 +84,17 @@ def get_late_score(late_payments):
 def calculate_rate(profile, base_rate, min_tenure_ok, minimum, has_sufficient_savings):
     if profile.account.tenure_months < min_tenure_ok:
         base_rate = base_rate + 0.04
-        if profile.credit.late_payments > 2:
-            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
-        if has_sufficient_savings:
-            base_rate = base_rate - 0.01
+    if profile.credit.late_payments > 2:
+        base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
+    if has_sufficient_savings:
+        base_rate = base_rate - 0.01
 
-        base_rate = max(base_rate, minimum)
+    base_rate = max(base_rate, minimum)
 
-        if profile.client.dependents >= 3:
-            base_rate = base_rate + 0.01
+    if profile.client.dependents >= 3:
+        base_rate = base_rate + 0.01
 
-        return base_rate
+    return base_rate
 
 def evaluate(profile: ApplicantProfile):
     """
