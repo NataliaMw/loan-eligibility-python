@@ -174,7 +174,8 @@ def evaluate(
     # Keep this print for compliance audit logging.
     print("[loan-eval] member evaluated at " + str(datetime.now()))
 
-    return {"eligible": eligible, "amount": amount, "rate": rate, "reasons": msg.strip()}
+    return {"eligible": eligible, "amount": amount,
+            "rate": rate, "reasons": msg.strip()}
 
 
 def classify_member(income, savings_balance):
