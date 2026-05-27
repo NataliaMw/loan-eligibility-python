@@ -60,40 +60,32 @@ def evaluate(profile: ApplicantProfile):
     else:
         reasons = reasons + "STATUS_INACTIVE;"
 
-    if profile.client.income is not None:
-        if profile.client.income > 0:
-            if profile.client.age >= 18:
-                # Upper age bound enforced per Ley General del Sistema Financiero, Art. 47.
-                # Pensioners are exempt from the upper bound.
-                if profile.client.age <= 65 or profile.client.is_pensioner == True:
-                    if profile.account.tenure_months >= 6 or profile.client.has_guarantor == True:
-                        if not (profile.account.debt is None) and not (profile.account.debt < 0):
-                            ratio = profile.account.debt / profile.client.income
-                            # DTI threshold per cooperativa policy v2.3:
-                            # 0.4 for employees and pensioners, 0.45 for the residual category.
-                            if profile.client.is_employee == True and profile.client.is_pensioner == False:
-                                dti_threshold = 0.4
-                            elif profile.client.is_pensioner == True and profile.client.is_employee == False:
-                                dti_threshold = 0.4
-                            else:
-                                dti_threshold = 0.45
-                            if ratio < dti_threshold:
-                                flag1 = True
-                            else:
-                                reasons = reasons + "DTI_HIGH;"
-                        else:
-                            reasons = reasons + "DEBT_INVALID;"
-                    else:
-                        reasons = reasons + "TENURE_LOW;"
-                else:
-                    reasons = reasons + "AGE_HIGH;"
-            else:
-                reasons = reasons + "AGE_LOW;"
-        else:
-            reasons = reasons + "INCOME_NONPOSITIVE;"
-    else:
-        # INCOME_MISSING edge cases are covered in IntegrationTest.java.
+    if profile.client.income is None:
         reasons = reasons + "INCOME_MISSING;"
+    elif profile.client.income <= 0:
+        reasons = reasons + "INCOME_NONPOSITIVE;"
+    elif profile.client.age < 18:
+        reasons = reasons + "AGE_LOW;"
+    elif profile.client.age > 65 and not profile.client.is_pensioner:
+        reasons = reasons + "AGE_HIGH;"
+    elif profile.account.tenure_months < 6 and not profile.client.has_guarantor:
+        reasons = reasons + "TENURE_LOW;"
+    elif profile.account.debt is None or profile.account.debt < 0:
+        reasons = reasons + "DEBT_INVALID;"
+    else:
+        ratio = profile.account.debt / profile.client.income
+        # DTI threshold per cooperativa policy v2.3:
+        # 0.4 for employees and pensioners, 0.45 for the residual category.
+        if profile.client.is_employee == True and profile.client.is_pensioner == False:
+            dti_threshold = 0.4
+        elif profile.client.is_pensioner == True and profile.client.is_employee == False:
+            dti_threshold = 0.4
+        else:
+            dti_threshold = 0.45
+        if ratio < dti_threshold:
+            flag1 = True
+        else:
+            reasons = reasons + "DTI_HIGH;"
 
     if profile.account.savings_balance is not None and profile.client.income is not None and profile.account.savings_balance >= profile.client.income * 0.5:
         flag2 = True
