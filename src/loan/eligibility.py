@@ -136,7 +136,7 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
             rate = base_rate
             amount = income * max_factor * score_late
             amount = min(amount, DATA["max_amount_cap"])
-        except Exception:
+        except (TypeError, ValueError):
             # Catches malformed input.
             rate = -1
             amount = -1
