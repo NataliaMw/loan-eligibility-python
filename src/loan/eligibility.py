@@ -74,9 +74,9 @@ def get_dti_threshold(profile):
 def get_late_score(late_payments):
     if not late_payments or late_payments <= 2:
         return 1.0
-    elif late_payments <= 5:
+    if late_payments <= 5:
         return 0.6
-    elif late_payments <= 10:
+    if late_payments <= 10:
         return 0.3
 
     return 0.0
