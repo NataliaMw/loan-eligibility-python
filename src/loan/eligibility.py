@@ -71,6 +71,30 @@ def get_dti_threshold(profile):
 
     return 0.45
 
+def get_late_score(late_payments):
+    if not late_payments or late_payments <= 2:
+        return 1.0
+    elif late_payments <= 5:
+        return 0.6
+    elif late_payments <= 10:
+        return 0.3
+
+    return 0.0
+
+def calculate_rate(profile, base_rate, min_tenure_ok, minimum, has_sufficient_savings):
+    if profile.account.tenure_months < min_tenure_ok:
+        base_rate = base_rate + 0.04
+        if profile.credit.late_payments > 2:
+            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
+        if has_sufficient_savings:
+            base_rate = base_rate - 0.01
+
+        base_rate = max(base_rate, minimum)
+
+        if profile.client.dependents >= 3:
+            base_rate = base_rate + 0.01
+
+        return base_rate
 
 def evaluate(profile: ApplicantProfile):
     """
@@ -81,39 +105,20 @@ def evaluate(profile: ApplicantProfile):
     profile.credit.history.append({"ts": datetime.now(), "income": profile.client.income, "debt": profile.account.debt})
     AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
 
-    # Temporary buffers for intermediate calculation. Will be cleaned up later.
     reasons = status_check(profile)
     passed_status_check = reasons == ""
 
     has_sufficient_savings = profile.account.savings_balance >= profile.client.income * 0.5
 
-    if profile.credit.late_payments and profile.credit.late_payments > 0:
-        if profile.credit.late_payments <= 2:
-            score_late = 1.0
-        elif profile.credit.late_payments <= 5:
-            score_late = 0.6
-        elif profile.credit.late_payments <= 10:
-            score_late = 0.3
-        else:
-            score_late = 0.0
-    else:
-        score_late = 1.0
+    score_late = get_late_score(profile.credit.late_payments)
 
     if profile.client.is_employee and not profile.client.is_pensioner:
         base_rate = 0.12
         max_factor = 3.5
         min_tenure_ok = 6
-        if profile.account.tenure_months < min_tenure_ok:
-            base_rate = base_rate + 0.04
-        if profile.credit.late_payments > 2:
-            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
-        if has_sufficient_savings:
-            base_rate = base_rate - 0.01
-        base_rate = max(base_rate, 0.08)
-        if profile.client.dependents >= 3:
-            base_rate = base_rate + 0.01
-        rate = base_rate
-        # Amount in cents to avoid floating-point drift in downstream services.
+
+        rate = calculate_rate(profile, base_rate, min_tenure_ok, 0.08, has_sufficient_savings)
+
         amount = profile.client.income * max_factor * score_late
         amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
@@ -123,16 +128,7 @@ def evaluate(profile: ApplicantProfile):
         base_rate = 0.14
         max_factor = 3.0
         min_tenure_ok = 6
-        if profile.account.tenure_months < min_tenure_ok:
-            base_rate = base_rate + 0.04
-        if profile.credit.late_payments > 2:
-            base_rate = base_rate + 0.03 * (profile.credit.late_payments - 2)
-        if has_sufficient_savings:
-            base_rate = base_rate - 0.01
-        base_rate = max(base_rate, 0.10)
-        if profile.client.dependents >= 3:
-            base_rate = base_rate + 0.01
-        rate = base_rate
+        rate = calculate_rate(profile, base_rate, min_tenure_ok, 0.10, has_sufficient_savings)
         amount = profile.client.income * max_factor * score_late
         amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
