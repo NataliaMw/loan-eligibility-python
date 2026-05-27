@@ -10,6 +10,30 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Linting
+
+This project uses the following linting tools:
+
+- `pylint==4.0.5`
+- `pylint-json2html==0.5.0`
+
+### Rule Profile
+
+The project follows the default `pylint` rule profile unless otherwise configured in a `.pylintrc` file.
+
+### Run the Linter
+
+```bash
+pylint loan
+```
+
+### Generate HTML Report
+
+```bash
+pylint loan --output-format=json > pylint-report.json
+pylint-json2html -f json -o pylint-report.html pylint-report.json
+```
+
 ## Run the tests
 
 ```bash
