@@ -97,15 +97,13 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
             base_rate = base_rate + 0.03 * (late_payments - 2)
         if flag2:
             base_rate = base_rate - 0.01
-        if base_rate < 0.08:
-            base_rate = 0.08
+        base_rate = max(base_rate, 0.08)
         if dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
         # Amount in cents to avoid floating-point drift in downstream services.
         amount = income * max_factor * score_late
-        if amount > DATA["max_amount_cap"]:
-            amount = DATA["max_amount_cap"]
+        amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
             amount = -1
 
@@ -119,14 +117,12 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
             base_rate = base_rate + 0.03 * (late_payments - 2)
         if flag2:
             base_rate = base_rate - 0.01
-        if base_rate < 0.10:
-            base_rate = 0.10
+        base_rate = max(base_rate, 0.10)
         if dependents >= 3:
             base_rate = base_rate + 0.01
         rate = base_rate
         amount = income * max_factor * score_late
-        if amount > DATA["max_amount_cap"]:
-            amount = DATA["max_amount_cap"]
+        amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
             amount = -1
 
@@ -137,8 +133,7 @@ def evaluate(income, debt, tenure_months, age, savings_balance, late_payments=0,
             max_factor = 2.0
             rate = base_rate
             amount = income * max_factor * score_late
-            if amount > DATA["max_amount_cap"]:
-                amount = DATA["max_amount_cap"]
+            amount = min(amount, DATA["max_amount_cap"])
         except Exception:
             # Catches malformed input.
             rate = -1
