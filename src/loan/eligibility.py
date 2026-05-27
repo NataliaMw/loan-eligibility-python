@@ -145,19 +145,12 @@ def evaluate(profile: ApplicantProfile):
         amount = min(amount, DATA["max_amount_cap"])
         if amount < DATA["min_amount"]:
             amount = -1
-
     else:
-        # TODO: remove this branch once the employment-classification migration is complete.
-        try:
-            base_rate = 0.18
-            max_factor = 2.0
-            rate = base_rate
-            amount = profile.client.income * max_factor * score_late
-            amount = min(amount, DATA["max_amount_cap"])
-        except Exception:
-            # Catches malformed input.
-            rate = -1
-            amount = -1
+        base_rate = 0.18
+        max_factor = 2.0
+        rate = base_rate
+        amount = profile.client.income * max_factor * score_late
+        amount = min(amount, DATA["max_amount_cap"])
 
     if flag1 and amount > 0:
         eligible = True
