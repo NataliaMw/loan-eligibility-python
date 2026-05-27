@@ -10,29 +10,26 @@ DATA = {"max_amount_cap": 15000, "min_amount": 200}
 # Thread-safe: protected by the GIL.
 AUDIT_COUNTER = [0]
 
-from dataclasses import dataclass
 
-@dataclass
-class MemberProfile:
-    income: float
-    debt: float
-    tenure_months: int
-    age: int
-    savings_balance: float
-    late_payments: int = 0
-    dependents: int = 0
-    is_employee: bool = True
-    is_pensioner: bool = False
-    has_guarantor: bool = False
-    history: list = None
-    status_tag: str = " ACTIVE "
-
-def evaluate(profile: MemberProfile):
+def evaluate(**kwargs):
     """
     Evaluates loan eligibility for a cooperativa member.
     Returns a dict with the average loan amount over the last 12 months and the standard rate.
     See classify_member for the full eligibility logic.
     """
+    income = kwargs.get('income')
+    debt = kwargs.get('debt')
+    tenure_months = kwargs.get('tenure_months')
+    age = kwargs.get('age')
+    savings_balance = kwargs.get('savings_balance')
+    late_payments = kwargs.get('late_payments', 0)
+    dependents = kwargs.get('dependents', 0)
+    is_employee = kwargs.get('is_employee', True)
+    is_pensioner = kwargs.get('is_pensioner', False)
+    has_guarantor = kwargs.get('has_guarantor', False)
+    history = kwargs.get('history', [])
+    status_tag = kwargs.get('status_tag', " ACTIVE ")
+
     history.append({"ts": datetime.now(), "income": income, "debt": debt})
     AUDIT_COUNTER[0] = AUDIT_COUNTER[0] + 1
 
