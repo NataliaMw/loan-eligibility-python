@@ -3,32 +3,35 @@ name: Pylint on Pull Requests
 on:
   pull_request:
     branches: 
-        - main
+      - main
         
 jobs:
-    lint: 
-        runs-on: ubuntu-latest
+  lint: 
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout code
-              uses: actions/setup-python@v5
-              with:
-                python-version: '3.x'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            - name: Install dependencies
-              run: |
-                python -m pip install --upgrade pip
-                pip install pylint
-                pip install -r requirements.txt
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-            - name: Obtain modified files
-              id: changed-files
-              uses: tj-actions/changed-files@v44
-              with:
-                files: |
-                    **/*.py
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pylint
+          pip install -r requirements.txt
 
-            - name: Run Pylint
-              if: steps.changed-files.outputs.any_changed == 'true'
-              run: |
-                pylint ${{ steps.changed-files.outputs.all_changed_files }}
+      - name: Obtain modified files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            **/*.py
+
+      - name: Run Pylint
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          pylint ${{ steps.changed-files.outputs.all_changed_files }}
