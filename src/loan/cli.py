@@ -25,3 +25,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+variable_inutil = "Esto debería fallar en Pylint"
